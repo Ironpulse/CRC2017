@@ -1,4 +1,9 @@
-__Author__      = "Shou Chaofan"
+
+__Author__      = "Shou Chaofan edited by Guo YuFei"
+
+'''
+This code is used when we are in the middle and the goal is to successfully transport the gear while in auto mode
+'''
 
 from config import *
 import wpilib
@@ -14,7 +19,7 @@ class MyRobot(wpilib.IterativeRobot):
         self.rf_motor           = wpilib.Spark(rearRightChannel)
         self.robot_drive        = wpilib.RobotDrive(self.lr_motor, self.rr_motor,
                                              self.lf_motor, self.rf_motor)
-        self.robot_drive .setExpiration(Expiration)
+        self.robot_drive.setExpiration(Expiration)
         self.robot_drive.setInvertedMotor(wpilib.RobotDrive.MotorType.kFrontLeft, lf_motor_inverse)
         self.robot_drive.setInvertedMotor(wpilib.RobotDrive.MotorType.kRearLeft, rf_motor_inverse)
         
@@ -25,27 +30,43 @@ class MyRobot(wpilib.IterativeRobot):
         self.solenoid3          = wpilib.DoubleSolenoid(Solenoid31Num,Solenoid32Num)
         self.a                  = 0
         self.b                  = 0
+        gyroChannel = 1
+        self.gyro = wpilib.AnalogGyro(gyroChannel)
     def autonomousInit(self):
         '''Called only at the beginning of autonomous mode'''
-        self.a = 0
-        self.b = 0
-        self.solenoid1.set(1)
-        self.solenoid2.set(1)
+        #self.a = 0
+        #self.b = 0
+        self.solenoid1.set(2)
+        self.solenoid2.set(2)
         self.solenoid3.set(2)
         global timer
         timer = wpilib.Timer()
         timer.start()
     def autonomousPeriodic(self):
         #move 65 inches
-        if timer.get() < 1.0: #1s
+        if timer.get() < 0.5: #1s
             pass
-        elif timer.get() < 1.0 + Stage1 and timer.get() >= 1.0: #10s
+        elif timer.get() < 0.5 + Stage1 and timer.get() >= 0.5: #Stage1, drive toward the destination
             print(1)
+            self.solenoid1.set(2)
+            self.solenoid2.set(2)
+            self.solenoid3.set(2)
+            self.robot_drive.mecanumDrive_Cartesian(0,0.5,0,0);
+        elif timer.get() < 0.5 + Stage1 + Stage2 and timer.get() >= 0.5 + Stage1: #Stage2, opening the lever
+            self.robot_drive.mecanumDrive_Cartesian(0,0,0,0);
             self.solenoid1.set(1)
             self.solenoid2.set(1)
-            self.solenoid3.set(2)
-            self.robot_drive.mecanumDrive_Cartesian(0,0.4,0,0);
-        elif timer.get() < 1.0 + Stage1 + Stage2 and timer.get() >= 1.0 + Stage1: #16s
+        elif timer.get() < 0.5 + Stage1 + Stage2 + Stage3 and timer.get() >= 0.5 + Stage1 + Stage2: #Stage3, pushing the gear outwards
+            self.solenoid3.set(1)
+        else:
+            if timer.get() < 0.5 + Stage1 + Stage2 + Stage3 + Stage4 and timer.get() >= 0.5 + Stage1 + Stage2 + Stage3:
+                self.robot_drive.mecanumDrive_Cartesian(0,-0.4,0,0);
+                #self.solenoid1.set(2)
+                #self.solenoid2.set(2)
+                #self.solenoid3.set(2)
+                
+                
+        '''elif timer.get() < 1.0 + Stage1 + Stage2 and timer.get() >= 1.0 + Stage1: #Stage2
         #solenoid
             print(2)
             self.solenoid3.set(1)
@@ -59,6 +80,7 @@ class MyRobot(wpilib.IterativeRobot):
                 self.solenoid1.set(1)
                 self.solenoid2.set(1)
                 self.robot_drive.mecanumDrive_Cartesian(0,0,0,0);
+                '''
                     
         
     def disabledInit(self):
@@ -78,20 +100,41 @@ class MyRobot(wpilib.IterativeRobot):
     def teleopInit(self):
         '''Called only at the beginning of teleoperated mode'''
         self.a = 0
-        self.solenoid1.set(1)
-        self.solenoid2.set(1)
+        self.solenoid1.set(2)
+        self.solenoid2.set(2)
         self.solenoid3.set(2)
+        self.gyro.calibrate()
     def teleopPeriodic(self):
         '''Called every 20ms in teleoperated mode'''
         
         # Move a motor with a Joystick
         try:
             self.robot_drive.setSafetyEnabled(True)
+            MOTOR_X = (-self.stick.getX())*1.3
+            MOTOR_Y = (-self.stick.getY())*1.3
+            MOTOR_Z = (-self.stick.getZ())/2
+
+            '''if MOTOR_Z < pct or MOTOR_Z > -pct:
+                if deviation > 5:
+                    if MOTOR_Y > 0:
+                        MOTOR_Z -= 0.1
+                    else:
+                        MOTOR_Z += 0.1
+                if deviation <-5:
+                    if MOTOR_Y >0:
+                        MOTOR_Z += 0.1
+                    else:
+                        MOTOR_Z -= 0.1
+                else:
+                    MOTOR_Z = (-self.stick.getZ())/2.5'''
+
+
+            
+
+            
             if self.isOperatorControl() and self.isEnabled():
-                if self.stick.getX() > pct or self.stick.getY() > pct or self.stick.getZ() > pct or self.stick.getX() < -pct or self.stick.getY() < -pct or self.stick.getZ() < -pct:
-                    self.robot_drive.mecanumDrive_Cartesian(self.stick.getX(),
-                                                            self.stick.getY(),
-                                                            self.stick.getZ(), 0);
+                if self.stick.getX() > pct or self.stick.getY() > pct or MOTOR_Z > pct or self.stick.getX() < -pct or self.stick.getY() < -pct or MOTOR_Z < -pct:
+                         self.robot_drive.mecanumDrive_Cartesian(MOTOR_X, MOTOR_Y, MOTOR_Z, -self.gyro.getAngle()*0.1);
 
                 if self.stick.getRawButton(7) == True: #climb
                     self.solenoid1.set(1)
@@ -121,3 +164,5 @@ class MyRobot(wpilib.IterativeRobot):
             raise error
 if __name__ == '__main__':
     wpilib.run(MyRobot)
+
+
